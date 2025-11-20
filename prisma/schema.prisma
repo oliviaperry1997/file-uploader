@@ -24,6 +24,7 @@ model User {
   
   // Relationships
   files     File[]
+  folders   Folder[]
 }
 
 model File {
@@ -42,8 +43,28 @@ model File {
   // Relationships
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId     String?
+  folder       Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
   
   @@map("files")
+}
+
+model Folder {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[] @relation("FolderHierarchy")
+  files       File[]
+  
+  @@map("folders")
 }
 
 model Session {

@@ -60,6 +60,24 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="folderId" class="form-label">Folder (Optional)</label>
+                        <select class="form-select" id="folderId" name="folderId">
+                            <option value="">Root (No folder)</option>
+                            <% if (typeof folders !== 'undefined') { %>
+                                <% folders.forEach(folder => { %>
+                                    <option value="<%= folder.id %>" 
+                                            <%= selectedFolderId === folder.id ? 'selected' : '' %>>
+                                        <%= folder.name %>
+                                    </option>
+                                <% }); %>
+                            <% } %>
+                        </select>
+                        <div class="form-text">
+                            Choose a folder to organize your file, or leave blank to store in the root directory.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <div class="form-check">
                             <input
                                 class="form-check-input"

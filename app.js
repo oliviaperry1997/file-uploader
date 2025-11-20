@@ -6,11 +6,13 @@ const expressLayouts = require('express-ejs-layouts');
 const passport = require('./config/passport');
 const flash = require('connect-flash');
 const { makeUserAvailable } = require('./middleware/auth');
+const methodOverride = require('method-override');
 const path = require('path');
 const fs = require('fs');
 
 const fileRoutes = require("./routes/files");
 const userRoutes = require("./routes/users");
+const folderRoutes = require("./routes/folders");
 
 const app = express();
 const prisma = new PrismaClient();
@@ -30,6 +32,7 @@ app.set("layout", "layout");
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, "public")));
 
 // Session configuration
@@ -70,6 +73,7 @@ app.use((req, res, next) => {
 // Routes
 app.use("/files", fileRoutes);
 app.use("/users", userRoutes);
+app.use("/folders", folderRoutes);
 
 // Home route
 app.get("/", (req, res) => {
