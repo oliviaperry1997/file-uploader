@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('../generated/prisma');
 const { ensureAuthenticated } = require('../middleware/auth');
+const { validateFolder, handleValidationErrors } = require('../middleware/validation');
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -85,14 +86,9 @@ router.get('/new', ensureAuthenticated, async (req, res) => {
 });
 
 // POST /folders - Create a new folder
-router.post('/', ensureAuthenticated, async (req, res) => {
+router.post('/', ensureAuthenticated, validateFolder, handleValidationErrors, async (req, res) => {
     try {
         const { name, description, parentId } = req.body;
-
-        if (!name || name.trim().length === 0) {
-            req.flash('error', 'Folder name is required');
-            return res.redirect('/folders/new');
-        }
 
         // Check if folder with same name exists in the same parent
         const existingFolder = await prisma.folder.findFirst({
@@ -170,14 +166,9 @@ router.get('/:id/edit', ensureAuthenticated, async (req, res) => {
 });
 
 // PUT /folders/:id - Update folder
-router.put('/:id', ensureAuthenticated, async (req, res) => {
+router.put('/:id', ensureAuthenticated, validateFolder, handleValidationErrors, async (req, res) => {
     try {
         const { name, description, parentId } = req.body;
-
-        if (!name || name.trim().length === 0) {
-            req.flash('error', 'Folder name is required');
-            return res.redirect(`/folders/${req.params.id}/edit`);
-        }
 
         const folder = await prisma.folder.findFirst({
             where: {

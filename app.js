@@ -13,6 +13,7 @@ const fs = require('fs');
 const fileRoutes = require("./routes/files");
 const userRoutes = require("./routes/users");
 const folderRoutes = require("./routes/folders");
+const { validationErrorHandler } = require("./middleware/validation");
 
 const app = express();
 const prisma = new PrismaClient();
@@ -81,6 +82,9 @@ app.get("/", (req, res) => {
         title: "File Uploader"
     });
 });
+
+// Validation error handling middleware
+app.use(validationErrorHandler);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

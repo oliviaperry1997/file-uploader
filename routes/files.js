@@ -3,8 +3,8 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
 const { PrismaClient } = require("../generated/prisma");
-const { body, validationResult } = require("express-validator");
 const { ensureAuthenticated } = require('../middleware/auth');
+const { validateFileUpload, validateFolderAssignment, handleValidationErrors } = require('../middleware/validation');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -109,33 +109,27 @@ router.post(
     "/upload",
     ensureAuthenticated,
     upload.single("file"),
-    [
-        body("description")
-            .optional()
-            .isLength({ max: 500 })
-            .withMessage("Description must be less than 500 characters"),
-        body("isPublic")
-            .optional()
-            .isBoolean()
-            .withMessage("Invalid public setting"),
-        body("folderId")
-            .optional()
-            .isUUID()
-            .withMessage("Invalid folder selection"),
-    ],
+    validateFileUpload,
     async (req, res) => {
         try {
+            // Handle validation errors with custom logic for file uploads
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
                 // Delete uploaded file if validation fails
                 if (req.file) {
-                    await fs.unlink(req.file.path);
+                    try {
+                        await fs.unlink(req.file.path);
+                    } catch (unlinkError) {
+                        console.error("Error deleting uploaded file:", unlinkError);
+                    }
                 }
-                return res.status(400).render("files/upload", {
-                    title: "Upload File",
-                    errors: errors.array(),
-                    user: req.user,
+                
+                // Add errors to flash messages
+                errors.array().forEach(error => {
+                    req.flash('error', error.msg);
                 });
+                
+                return res.redirect('/files/upload');
             }
 
             if (!req.file) {
@@ -302,7 +296,7 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
 });
 
 // PUT /files/:id/folder - Update file's folder assignment
-router.put("/:id/folder", ensureAuthenticated, async (req, res) => {
+router.put("/:id/folder", ensureAuthenticated, validateFolderAssignment, handleValidationErrors, async (req, res) => {
     try {
         const { folderId } = req.body;
 
