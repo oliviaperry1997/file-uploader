@@ -1,79 +1,68 @@
-<div class="row">
-    <div class="col-md-8 mx-auto">
-        <div class="text-center mb-5">
-            <h1 class="display-4">
-                <i class="fas fa-cloud-upload-alt text-primary"></i>
-                Welcome to File Uploader
-            </h1>
-            <p class="lead">Securely upload, manage, and share your files</p>
+<div class="max-w-4xl mx-auto">
+    <div class="text-center mb-12">
+        <h1 class="text-5xl font-bold text-gray-900 mb-4">
+            <i class="fas fa-cloud-upload-alt text-blue-600"></i>
+            Welcome to File Uploader
+        </h1>
+        <p class="text-xl text-gray-600">Securely upload, manage, and share your files</p>
+    </div>
+        
+    <% if (typeof user !== 'undefined' && user) { %>
+        <div class="grid md:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-xl transition-shadow">
+                <i class="fas fa-upload text-5xl text-blue-600 mb-6"></i>
+                <h5 class="text-xl font-semibold text-gray-900 mb-4">Upload Files</h5>
+                <p class="text-gray-600 mb-6">Upload your documents, images, and other files securely.</p>
+                <a href="/files/upload" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                    Start Uploading
+                </a>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-xl transition-shadow">
+                <i class="fas fa-folder-open text-5xl text-green-600 mb-6"></i>
+                <h5 class="text-xl font-semibold text-gray-900 mb-4">Manage Files</h5>
+                <p class="text-gray-600 mb-6">View, download, and organize all your uploaded files.</p>
+                <a href="/files" class="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+                    View My Files
+                </a>
+            </div>
         </div>
         
-        <% if (typeof user !== 'undefined' && user) { %>
-            <div class="row">
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body text-center">
-                            <i class="fas fa-upload fa-3x text-primary mb-3"></i>
-                            <h5 class="card-title">Upload Files</h5>
-                            <p class="card-text">Upload your documents, images, and other files securely.</p>
-                            <a href="/files/upload" class="btn btn-primary">
-                                Start Uploading
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body text-center">
-                            <i class="fas fa-folder-open fa-3x text-success mb-3"></i>
-                            <h5 class="card-title">Manage Files</h5>
-                            <p class="card-text">View, download, and organize all your uploaded files.</p>
-                            <a href="/files" class="btn btn-success">
-                                View My Files
-                            </a>
-                        </div>
-                    </div>
-                </div>
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-r-lg">
+            <h5 class="flex items-center text-lg font-semibold text-blue-900 mb-2">
+                <i class="fas fa-info-circle mr-2"></i>
+                Welcome back, <%= user.name %>!
+            </h5>
+            <p class="text-blue-800">You can upload files up to 10MB in size. Supported formats: JPEG, PNG, GIF, PDF, DOC, DOCX, TXT, ZIP.</p>
+        </div>
+    <% } else { %>
+        <div class="grid md:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-xl transition-shadow">
+                <i class="fas fa-user-plus text-5xl text-blue-600 mb-6"></i>
+                <h5 class="text-xl font-semibold text-gray-900 mb-4">Get Started</h5>
+                <p class="text-gray-600 mb-6">Create an account to start uploading and managing your files.</p>
+                <a href="/users/register" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                    Register Now
+                </a>
             </div>
             
-            <div class="alert alert-info mt-4">
-                <h5><i class="fas fa-info-circle me-2"></i>Welcome back, <%= user.name %>!</h5>
-                <p class="mb-0">You can upload files up to 10MB in size. Supported formats: JPEG, PNG, GIF, PDF, DOC, DOCX, TXT, ZIP.</p>
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center hover:shadow-xl transition-shadow">
+                <i class="fas fa-sign-in-alt text-5xl text-green-600 mb-6"></i>
+                <h5 class="text-xl font-semibold text-gray-900 mb-4">Already Have Account?</h5>
+                <p class="text-gray-600 mb-6">Sign in to access your files and upload new ones.</p>
+                <a href="/users/login" class="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+                    Sign In
+                </a>
             </div>
-        <% } else { %>
-            <div class="row">
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body text-center">
-                            <i class="fas fa-user-plus fa-3x text-primary mb-3"></i>
-                            <h5 class="card-title">Get Started</h5>
-                            <p class="card-text">Create an account to start uploading and managing your files.</p>
-                            <a href="/users/register" class="btn btn-primary">
-                                Register Now
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body text-center">
-                            <i class="fas fa-sign-in-alt fa-3x text-success mb-3"></i>
-                            <h5 class="card-title">Already Have Account?</h5>
-                            <p class="card-text">Sign in to access your files and upload new ones.</p>
-                            <a href="/users/login" class="btn btn-success">
-                                Sign In
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="alert alert-primary mt-4">
-                <h5><i class="fas fa-shield-alt me-2"></i>Secure File Storage</h5>
-                <p class="mb-0">Your files are stored securely and only accessible by you unless you choose to make them public.</p>
-            </div>
-        <% } %>
+        </div>
+        
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-r-lg">
+            <h5 class="flex items-center text-lg font-semibold text-blue-900 mb-2">
+                <i class="fas fa-shield-alt mr-2"></i>
+                Secure File Storage
+            </h5>
+            <p class="text-blue-800">Your files are stored securely and only accessible by you unless you choose to make them public.</p>
+        </div>
+    <% } %>
     </div>
 </div>

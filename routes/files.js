@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs").promises;
 const { PrismaClient } = require("../generated/prisma");
 const { body, validationResult } = require("express-validator");
+const { ensureAuthenticated } = require('../middleware/auth');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -46,20 +47,14 @@ const upload = multer({
     },
 });
 
-// Middleware to check if user is logged in
-const requireAuth = (req, res, next) => {
-    if (!req.session.user) {
-        return res.redirect("/users/login");
-    }
-    next();
-};
+
 
 // GET /files - List all files for the current user
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", ensureAuthenticated, async (req, res) => {
     try {
         const files = await prisma.file.findMany({
             where: {
-                userId: req.session.user.id,
+                userId: req.user.id,
             },
             orderBy: {
                 uploadedAt: "desc",
@@ -69,7 +64,7 @@ router.get("/", requireAuth, async (req, res) => {
         res.render("files/index", {
             title: "My Files",
             files,
-            user: req.session.user,
+            user: req.user,
         });
     } catch (error) {
         console.error("Error fetching files:", error);
@@ -78,17 +73,16 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 // GET /files/upload - Show upload form
-router.get("/upload", requireAuth, (req, res) => {
+router.get("/upload", ensureAuthenticated, (req, res) => {
     res.render("files/upload", {
-        title: "Upload File",
-        user: req.session.user,
+        title: "Upload File"
     });
 });
 
 // POST /files/upload - Handle file upload
 router.post(
     "/upload",
-    requireAuth,
+    ensureAuthenticated,
     upload.single("file"),
     [
         body("description")
@@ -111,7 +105,7 @@ router.post(
                 return res.status(400).render("files/upload", {
                     title: "Upload File",
                     errors: errors.array(),
-                    user: req.session.user,
+                    user: req.user,
                 });
             }
 
@@ -119,7 +113,7 @@ router.post(
                 return res.status(400).render("files/upload", {
                     title: "Upload File",
                     errors: [{ msg: "No file uploaded" }],
-                    user: req.session.user,
+                    user: req.user,
                 });
             }
 
@@ -133,7 +127,7 @@ router.post(
                     path: req.file.path,
                     description: req.body.description || null,
                     isPublic: req.body.isPublic === "true",
-                    userId: req.session.user.id,
+                    userId: req.user.id,
                 },
             });
 
@@ -154,12 +148,12 @@ router.post(
 );
 
 // GET /files/:id/download - Download a file
-router.get("/:id/download", requireAuth, async (req, res) => {
+router.get("/:id/download", ensureAuthenticated, async (req, res) => {
     try {
         const file = await prisma.file.findFirst({
             where: {
                 id: req.params.id,
-                OR: [{ userId: req.session.user.id }, { isPublic: true }],
+                OR: [{ userId: req.user.id }, { isPublic: true }],
             },
         });
 
@@ -175,12 +169,12 @@ router.get("/:id/download", requireAuth, async (req, res) => {
 });
 
 // DELETE /files/:id - Delete a file
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", ensureAuthenticated, async (req, res) => {
     try {
         const file = await prisma.file.findFirst({
             where: {
                 id: req.params.id,
-                userId: req.session.user.id,
+                userId: req.user.id,
             },
         });
 

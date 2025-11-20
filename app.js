@@ -3,8 +3,11 @@ const session = require('express-session');
 const { PrismaSessionStore } = require('@quixo3/prisma-session-store');
 const { PrismaClient } = require('./generated/prisma');
 const expressLayouts = require('express-ejs-layouts');
-const path = require("path");
-const fs = require("fs");
+const passport = require('./config/passport');
+const flash = require('connect-flash');
+const { makeUserAvailable } = require('./middleware/auth');
+const path = require('path');
+const fs = require('fs');
 
 const fileRoutes = require("./routes/files");
 const userRoutes = require("./routes/users");
@@ -36,8 +39,8 @@ app.use(
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         },
         secret: process.env.SESSION_SECRET || "your-secret-key",
-        resave: true,
-        saveUninitialized: true,
+        resave: false,
+        saveUninitialized: false,
         store: new PrismaSessionStore(prisma, {
             checkPeriod: 2 * 60 * 1000, // 2 minutes
             dbRecordIdIsSessionId: true,
@@ -46,6 +49,24 @@ app.use(
     })
 );
 
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Flash messages
+app.use(flash());
+
+// Make user available in templates
+app.use(makeUserAvailable);
+
+// Flash messages middleware
+app.use((req, res, next) => {
+    res.locals.success_msg = req.flash('success');
+    res.locals.error_msg = req.flash('error');
+    res.locals.error = req.flash('error');
+    next();
+});
+
 // Routes
 app.use("/files", fileRoutes);
 app.use("/users", userRoutes);
@@ -53,8 +74,7 @@ app.use("/users", userRoutes);
 // Home route
 app.get("/", (req, res) => {
     res.render("index", {
-        title: "File Uploader",
-        user: req.session.user,
+        title: "File Uploader"
     });
 });
 
