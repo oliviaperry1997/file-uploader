@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient } = require("../generated/prisma");
 const { body, validationResult } = require("express-validator");
 
 const router = express.Router();

@@ -1,8 +1,8 @@
-const express = require("express");
-const session = require("express-session");
-const { PrismaSessionStore } = require("@quixo3/prisma-session-store");
-const { PrismaClient } = require("@prisma/client");
-const expressLayouts = require("express-ejs-layouts");
+const express = require('express');
+const session = require('express-session');
+const { PrismaSessionStore } = require('@quixo3/prisma-session-store');
+const { PrismaClient } = require('./generated/prisma');
+const expressLayouts = require('express-ejs-layouts');
 const path = require("path");
 const fs = require("fs");
 
