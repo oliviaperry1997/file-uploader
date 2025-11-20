@@ -1,3 +1,10 @@
+# Uploads directory (contains user files)
+uploads/*
+!uploads/.gitkeep
+
+# Generated Prisma files
+generated/
+
 # Logs
 logs
 *.log
@@ -137,3 +144,5 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+/generated/prisma
