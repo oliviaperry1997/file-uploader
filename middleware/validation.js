@@ -65,13 +65,13 @@ const validateFileUpload = [
     body('folderId')
         .optional()
         .custom((value) => {
-            // Allow empty string (no folder selected) or valid UUID
+            // Allow empty string (no folder selected) or valid CUID
             if (!value || value === '') {
                 return true;
             }
-            // Check if it's a valid UUID
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-            if (!uuidRegex.test(value)) {
+            // Check if it's a valid CUID (25 characters, alphanumeric)
+            const cuidRegex = /^c[a-z0-9]{24}$/;
+            if (!cuidRegex.test(value)) {
                 throw new Error('Invalid folder selection');
             }
             return true;
@@ -97,16 +97,36 @@ const validateFolder = [
     
     body('parentId')
         .optional()
-        .isUUID()
-        .withMessage('Invalid parent folder selection')
+        .custom((value) => {
+            // Allow empty string (no parent folder) or valid CUID
+            if (!value || value === '') {
+                return true;
+            }
+            // Check if it's a valid CUID (25 characters, alphanumeric)
+            const cuidRegex = /^c[a-z0-9]{24}$/;
+            if (!cuidRegex.test(value)) {
+                throw new Error('Invalid parent folder selection');
+            }
+            return true;
+        })
 ];
 
 // Validation rules for folder assignment
 const validateFolderAssignment = [
     body('folderId')
         .optional()
-        .isUUID()
-        .withMessage('Invalid folder selection')
+        .custom((value) => {
+            // Allow empty string (no folder selected) or valid CUID
+            if (!value || value === '') {
+                return true;
+            }
+            // Check if it's a valid CUID (25 characters, starts with 'c', alphanumeric)
+            const cuidRegex = /^c[a-z0-9]{24}$/;
+            if (!cuidRegex.test(value)) {
+                throw new Error('Invalid folder selection');
+            }
+            return true;
+        })
 ];
 
 // Middleware to handle validation errors
@@ -149,6 +169,13 @@ const validationErrorHandler = (err, req, res, next) => {
             const folderId = originalUrl.match(/\/folders\/([^\/]+)/)?.[1];
             if (folderId) {
                 return res.redirect(`/folders/${folderId}/edit`);
+            }
+        }
+        if (originalUrl.includes('/assign-folder') && method === 'POST') {
+            // Extract file ID from URL for folder assignment redirects
+            const fileId = originalUrl.match(/\/files\/([^\/]+)/)?.[1];
+            if (fileId) {
+                return res.redirect(`/files/${fileId}`);
             }
         }
         

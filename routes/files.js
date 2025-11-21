@@ -97,21 +97,9 @@ router.post(
     validateFileUpload,
     async (req, res) => {
         try {
-            console.log('=== FILE UPLOAD DEBUG ===');
-            console.log('User:', req.user?.id);
-            console.log('File:', req.file ? {
-                originalname: req.file.originalname,
-                mimetype: req.file.mimetype,
-                size: req.file.size,
-                buffer: req.file.buffer ? 'Present' : 'Missing'
-            } : 'No file uploaded');
-            console.log('Body:', req.body);
-            
             // Handle validation errors with custom logic for file uploads
-            console.log('Checking validation errors...');
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                console.log('Validation errors found:', errors.array());
                 // No need to delete file since we're using memory storage with Supabase
                 // File buffer is automatically cleaned up when request ends
                 
@@ -122,17 +110,13 @@ router.post(
                 
                 return res.redirect('/files/upload');
             }
-            console.log('No validation errors');
 
             if (!req.file) {
-                console.log('No file found in request');
                 req.flash('error', 'No file uploaded');
                 return res.redirect('/files/upload');
             }
-            console.log('File validated successfully');
 
             // Validate folder ownership if folderId is provided
-            console.log('Processing folder ID:', req.body.folderId);
             let folderId = req.body.folderId || null;
             if (folderId) {
                 const folder = await prisma.folder.findFirst({
@@ -148,16 +132,13 @@ router.post(
 
             // Generate storage path for Supabase
             const storagePath = generateStoragePath(req.user.id, folderId, req.file.originalname);
-            console.log('Generated storage path:', storagePath);
 
             // Upload file to Supabase Storage
-            console.log('Starting Supabase upload...');
             const { data: uploadData, error: uploadError } = await uploadFile(
                 req.file.buffer,
                 storagePath,
                 req.file.mimetype
             );
-            console.log('Upload result:', { data: uploadData, error: uploadError });
 
             if (uploadError) {
                 console.error("Error uploading to Supabase:", uploadError);
@@ -173,8 +154,7 @@ router.post(
                     originalName: req.file.originalname,
                     mimeType: req.file.mimetype,
                     size: req.file.size,
-                    path: storagePath, // Keep for backwards compatibility
-                    storagePath: storagePath, // New Supabase path
+                    storagePath: storagePath,
                     description: req.body.description || null,
                     isPublic: req.body.isPublic === "true",
                     userId: req.user.id,
@@ -340,8 +320,9 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
     }
 });
 
-// PUT /files/:id/folder - Update file's folder assignment
-router.put("/:id/folder", ensureAuthenticated, validateFolderAssignment, handleValidationErrors, async (req, res) => {
+// POST /files/:id/assign-folder - Update file's folder assignment
+router.post("/:id/assign-folder", ensureAuthenticated, validateFolderAssignment, handleValidationErrors, async (req, res) => {
+    console.log('POST /files/:id/assign-folder route hit:', { fileId: req.params.id, folderId: req.body.folderId });
     try {
         const { folderId } = req.body;
 
@@ -353,12 +334,13 @@ router.put("/:id/folder", ensureAuthenticated, validateFolderAssignment, handleV
         });
 
         if (!file) {
-            return res.status(404).json({ error: "File not found" });
+            req.flash('error', 'File not found');
+            return res.redirect('/files');
         }
 
         // Validate folder ownership if folderId is provided
         let validatedFolderId = null;
-        if (folderId) {
+        if (folderId && folderId !== '') {
             const folder = await prisma.folder.findFirst({
                 where: {
                     id: folderId,
@@ -367,6 +349,9 @@ router.put("/:id/folder", ensureAuthenticated, validateFolderAssignment, handleV
             });
             if (folder) {
                 validatedFolderId = folderId;
+            } else {
+                req.flash('error', 'Selected folder not found');
+                return res.redirect(`/files/${req.params.id}`);
             }
         }
 
@@ -376,11 +361,13 @@ router.put("/:id/folder", ensureAuthenticated, validateFolderAssignment, handleV
             data: { folderId: validatedFolderId }
         });
 
-        req.flash('success', 'File folder updated successfully');
-        res.redirect(`/files/${req.params.id}`);
+        req.flash('success', 'File moved successfully');
+        const redirectUrl = `/files/${req.params.id}`;
+        console.log('Redirecting to:', redirectUrl);
+        res.redirect(redirectUrl);
     } catch (error) {
         console.error("Error updating file folder:", error);
-        req.flash('error', 'Unable to update file folder');
+        req.flash('error', 'Unable to move file');
         res.redirect(`/files/${req.params.id}`);
     }
 });

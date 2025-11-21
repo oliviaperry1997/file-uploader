@@ -4,19 +4,11 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Use service role key for server-side operations
 
 if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('Supabase URL:', supabaseUrl ? 'Present' : 'Missing');
-    console.error('Supabase Service Key:', supabaseServiceKey ? 'Present' : 'Missing');
     throw new Error('Missing Supabase configuration. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env file');
 }
 
 // Storage bucket name
 const STORAGE_BUCKET = 'user-files';
-
-console.log('Supabase initialized:', {
-    url: supabaseUrl,
-    keyPresent: !!supabaseServiceKey,
-    bucket: STORAGE_BUCKET
-});
 
 // Create Supabase client with service role key for full access
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -53,13 +45,6 @@ const generateStoragePath = (userId, folderId, filename) => {
  */
 const uploadFile = async (fileBuffer, storagePath, mimeType) => {
     try {
-        console.log('uploadFile called with:', {
-            bufferSize: fileBuffer?.length,
-            storagePath,
-            mimeType,
-            bucket: STORAGE_BUCKET
-        });
-        
         const { data, error } = await supabase.storage
             .from(STORAGE_BUCKET)
             .upload(storagePath, fileBuffer, {
@@ -67,11 +52,9 @@ const uploadFile = async (fileBuffer, storagePath, mimeType) => {
                 duplex: 'half'
             });
 
-        console.log('Supabase storage response:', { data, error });
         return { data, error };
     } catch (error) {
         console.error('Error uploading file to Supabase:', error);
-        console.error('Error stack:', error.stack);
         return { data: null, error };
     }
 };
