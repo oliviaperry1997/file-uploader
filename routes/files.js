@@ -1,39 +1,24 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs").promises;
+const { validationResult } = require('express-validator');
 const { PrismaClient } = require("../generated/prisma");
 const { ensureAuthenticated } = require('../middleware/auth');
 const { validateFileUpload, validateFolderAssignment, handleValidationErrors } = require('../middleware/validation');
+const { generateStoragePath, uploadFile, downloadFile, deleteFile, createSignedUrl } = require('../config/supabase');
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "uploads/");
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        cb(
-            null,
-            file.fieldname +
-                "-" +
-                uniqueSuffix +
-                path.extname(file.originalname)
-        );
-    },
-});
-
+// Configure multer for memory storage (files will be uploaded to Supabase)
 const upload = multer({
-    storage: storage,
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit
     },
     fileFilter: function (req, file, cb) {
         // Allow common file types
-        const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|zip/;
+        const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|zip|mp4|mov|avi|mp3|wav/;
         const extname = allowedTypes.test(
             path.extname(file.originalname).toLowerCase()
         );
@@ -112,17 +97,23 @@ router.post(
     validateFileUpload,
     async (req, res) => {
         try {
+            console.log('=== FILE UPLOAD DEBUG ===');
+            console.log('User:', req.user?.id);
+            console.log('File:', req.file ? {
+                originalname: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size: req.file.size,
+                buffer: req.file.buffer ? 'Present' : 'Missing'
+            } : 'No file uploaded');
+            console.log('Body:', req.body);
+            
             // Handle validation errors with custom logic for file uploads
+            console.log('Checking validation errors...');
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                // Delete uploaded file if validation fails
-                if (req.file) {
-                    try {
-                        await fs.unlink(req.file.path);
-                    } catch (unlinkError) {
-                        console.error("Error deleting uploaded file:", unlinkError);
-                    }
-                }
+                console.log('Validation errors found:', errors.array());
+                // No need to delete file since we're using memory storage with Supabase
+                // File buffer is automatically cleaned up when request ends
                 
                 // Add errors to flash messages
                 errors.array().forEach(error => {
@@ -131,16 +122,17 @@ router.post(
                 
                 return res.redirect('/files/upload');
             }
+            console.log('No validation errors');
 
             if (!req.file) {
-                return res.status(400).render("files/upload", {
-                    title: "Upload File",
-                    errors: [{ msg: "No file uploaded" }],
-                    user: req.user,
-                });
+                console.log('No file found in request');
+                req.flash('error', 'No file uploaded');
+                return res.redirect('/files/upload');
             }
+            console.log('File validated successfully');
 
             // Validate folder ownership if folderId is provided
+            console.log('Processing folder ID:', req.body.folderId);
             let folderId = req.body.folderId || null;
             if (folderId) {
                 const folder = await prisma.folder.findFirst({
@@ -154,14 +146,35 @@ router.post(
                 }
             }
 
+            // Generate storage path for Supabase
+            const storagePath = generateStoragePath(req.user.id, folderId, req.file.originalname);
+            console.log('Generated storage path:', storagePath);
+
+            // Upload file to Supabase Storage
+            console.log('Starting Supabase upload...');
+            const { data: uploadData, error: uploadError } = await uploadFile(
+                req.file.buffer,
+                storagePath,
+                req.file.mimetype
+            );
+            console.log('Upload result:', { data: uploadData, error: uploadError });
+
+            if (uploadError) {
+                console.error("Error uploading to Supabase:", uploadError);
+                console.error("Upload error details:", JSON.stringify(uploadError, null, 2));
+                req.flash('error', `Failed to upload file to storage: ${uploadError.message || 'Unknown error'}`);
+                return res.redirect('/files/upload');
+            }
+
             // Save file info to database
             const file = await prisma.file.create({
                 data: {
-                    filename: req.file.filename,
+                    filename: storagePath.split('/').pop(), // Extract filename from path
                     originalName: req.file.originalname,
                     mimeType: req.file.mimetype,
                     size: req.file.size,
-                    path: req.file.path,
+                    path: storagePath, // Keep for backwards compatibility
+                    storagePath: storagePath, // New Supabase path
                     description: req.body.description || null,
                     isPublic: req.body.isPublic === "true",
                     userId: req.user.id,
@@ -169,18 +182,13 @@ router.post(
                 },
             });
 
+            req.flash('success', 'File uploaded successfully!');
             res.redirect("/files");
         } catch (error) {
             console.error("Error uploading file:", error);
-            // Delete uploaded file if database save fails
-            if (req.file) {
-                try {
-                    await fs.unlink(req.file.path);
-                } catch (unlinkError) {
-                    console.error("Error deleting file:", unlinkError);
-                }
-            }
-            res.status(500).render("error", { error, title: "Error" });
+            console.error("Full error stack:", error.stack);
+            req.flash('error', `An error occurred during file upload: ${error.message}`);
+            res.redirect('/files/upload');
         }
     }
 );
@@ -199,7 +207,31 @@ router.get("/:id/download", ensureAuthenticated, async (req, res) => {
             return res.status(404).render("404", { title: "File Not Found" });
         }
 
-        res.download(file.path, file.originalName);
+        // Use storagePath if available, otherwise fall back to legacy path
+        const pathToUse = file.storagePath || file.path;
+        
+        if (file.storagePath) {
+            // Download from Supabase
+            const { data: fileData, error: downloadError } = await downloadFile(pathToUse);
+            
+            if (downloadError || !fileData) {
+                console.error("Error downloading from Supabase:", downloadError);
+                return res.status(500).render("error", { 
+                    error: new Error("Failed to download file"), 
+                    title: "Error" 
+                });
+            }
+            
+            // Convert blob to buffer and send
+            const buffer = Buffer.from(await fileData.arrayBuffer());
+            res.setHeader('Content-Disposition', `attachment; filename="${file.originalName}"`);
+            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Length', buffer.length);
+            res.send(buffer);
+        } else {
+            // Legacy: download from local filesystem (for backward compatibility)
+            res.download(file.path, file.originalName);
+        }
     } catch (error) {
         console.error("Error downloading file:", error);
         res.status(500).render("error", { error, title: "Error" });
@@ -220,11 +252,24 @@ router.delete("/:id", ensureAuthenticated, async (req, res) => {
             return res.status(404).json({ error: "File not found" });
         }
 
-        // Delete file from filesystem
-        try {
-            await fs.unlink(file.path);
-        } catch (fsError) {
-            console.error("Error deleting file from filesystem:", fsError);
+        // Delete file from storage
+        const pathToUse = file.storagePath || file.path;
+        
+        if (file.storagePath) {
+            // Delete from Supabase
+            const { error: deleteError } = await deleteFile(pathToUse);
+            if (deleteError) {
+                console.error("Error deleting file from Supabase:", deleteError);
+                // Continue with database deletion even if storage deletion fails
+            }
+        } else {
+            // Legacy: delete from local filesystem
+            try {
+                const fs = require('fs').promises;
+                await fs.unlink(file.path);
+            } catch (fsError) {
+                console.error("Error deleting file from filesystem:", fsError);
+            }
         }
 
         // Delete file record from database
@@ -337,6 +382,40 @@ router.put("/:id/folder", ensureAuthenticated, validateFolderAssignment, handleV
         console.error("Error updating file folder:", error);
         req.flash('error', 'Unable to update file folder');
         res.redirect(`/files/${req.params.id}`);
+    }
+});
+
+// GET /files/:id/preview - Get file preview URL (for images, etc.)
+router.get("/:id/preview", ensureAuthenticated, async (req, res) => {
+    try {
+        const file = await prisma.file.findFirst({
+            where: {
+                id: req.params.id,
+                OR: [{ userId: req.user.id }, { isPublic: true }],
+            },
+        });
+
+        if (!file) {
+            return res.status(404).json({ error: "File not found" });
+        }
+
+        if (file.storagePath) {
+            // Create a signed URL for Supabase files (valid for 1 hour)
+            const { data: signedUrl, error } = await createSignedUrl(file.storagePath, 3600);
+            
+            if (error || !signedUrl) {
+                console.error("Error creating signed URL:", error);
+                return res.status(500).json({ error: "Failed to create preview URL" });
+            }
+            
+            return res.json({ url: signedUrl.signedUrl });
+        } else {
+            // Legacy: return download URL for local files
+            return res.json({ url: `/files/${file.id}/download` });
+        }
+    } catch (error) {
+        console.error("Error creating preview URL:", error);
+        res.status(500).json({ error: "Internal server error" });
     }
 });
 

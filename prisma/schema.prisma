@@ -33,7 +33,8 @@ model File {
   originalName String
   mimeType     String
   size         Int
-  path         String
+  path         String   // Legacy field - kept for backwards compatibility
+  storagePath  String?  // Supabase storage path - optional for migration
   uploadedAt   DateTime @default(now())
   
   // File metadata

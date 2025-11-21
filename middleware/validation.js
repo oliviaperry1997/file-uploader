@@ -64,8 +64,18 @@ const validateFileUpload = [
     
     body('folderId')
         .optional()
-        .isUUID()
-        .withMessage('Invalid folder selection')
+        .custom((value) => {
+            // Allow empty string (no folder selected) or valid UUID
+            if (!value || value === '') {
+                return true;
+            }
+            // Check if it's a valid UUID
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(value)) {
+                throw new Error('Invalid folder selection');
+            }
+            return true;
+        })
 ];
 
 // Validation rules for folder operations
