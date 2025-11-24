@@ -41,6 +41,12 @@
                     </a>
 
                     <div class="flex items-center space-x-4">
+                        <!-- Public Files - visible to everyone -->
+                        <a class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors" href="/files/public">
+                            <i class="fas fa-globe mr-1"></i>
+                            Public Files
+                        </a>
+                        
                     <% if (typeof user !== 'undefined' && user) { %>
                     <a class="nav-link" href="/files">
                         <i class="fas fa-file me-1"></i>

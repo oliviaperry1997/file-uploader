@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('../generated/prisma');
 const passport = require('passport');
 const bcrypt = require('bcryptjs');
+const { validationResult } = require('express-validator');
 const { ensureAuthenticated, ensureGuest } = require('../middleware/auth');
 const { validateLogin, validateRegister, handleValidationErrors } = require('../middleware/validation');
 
@@ -35,38 +36,33 @@ router.get('/register', ensureGuest, (req, res) => {
 });
 
 // POST /users/register - Handle registration
-router.post('/register',
-    validateRegister,
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            // Check if user already exists
-            const existingUser = await prisma.user.findUnique({
-                where: { email: req.body.email },
-            });
+router.post('/register', validateRegister, handleValidationErrors, async (req, res) => {
+    try {
+        // Check if user already exists
+        const existingUser = await prisma.user.findUnique({
+            where: { email: req.body.email },
+        });
 
-            if (existingUser) {
-                req.flash('error', 'User with this email already exists');
-                return res.redirect('/users/register');
-            }
-
+        if (existingUser) {
+            req.flash('error', 'User with this email already exists');
+            return res.redirect('/users/register');
+        }            console.log('Hashing password...');
             // Hash password
             const saltRounds = 12;
             const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
+            console.log('Password hashed successfully');
             
-            // Create new user
-            const user = await prisma.user.create({
-                data: {
-                    email: req.body.email.toLowerCase(),
-                    name: req.body.name,
-                    password: hashedPassword
-                },
-            });
-
-            // Log in the user automatically after registration
+        
+        // Create new user
+        const user = await prisma.user.create({
+            data: {
+                email: req.body.email.toLowerCase(),
+                name: req.body.name,
+                password: hashedPassword
+            },
+        });            // Log in the user automatically after registration
             req.login(user, (err) => {
                 if (err) {
-                    console.error('Error logging in after registration:', err);
                     req.flash('error', 'Registration successful but login failed. Please try logging in.');
                     return res.redirect('/users/login');
                 }
@@ -75,8 +71,7 @@ router.post('/register',
             });
             
         } catch (error) {
-            console.error("Error during registration:", error);
-            req.flash('error', 'Registration failed. Please try again.');
+            req.flash('error', `Registration failed: ${error.message || 'Unknown error'}`);
             res.redirect('/users/register');
         }
     }

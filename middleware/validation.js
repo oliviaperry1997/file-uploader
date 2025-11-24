@@ -133,56 +133,17 @@ const validateFolderAssignment = [
 const handleValidationErrors = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        // Add errors to flash messages
-        errors.array().forEach(error => {
-            req.flash('error', error.msg);
-        });
+        req.flash('errors', errors.array());
         
-        // Store the validation errors in req for template rendering
-        req.validationErrors = errors.array();
-        return next('validation_error');
+        if (req.originalUrl.includes('/login')) {
+            return res.redirect('/users/login');
+        } else if (req.originalUrl.includes('/register')) {
+            return res.redirect('/users/register');
+        } else {
+            return res.redirect(req.originalUrl);
+        }
     }
     next();
-};
-
-// Error handler specifically for validation errors
-const validationErrorHandler = (err, req, res, next) => {
-    if (err === 'validation_error') {
-        // Determine the appropriate redirect based on the route
-        const originalUrl = req.originalUrl;
-        const method = req.method;
-        
-        if (originalUrl.includes('/users/register') && method === 'POST') {
-            return res.redirect('/users/register');
-        }
-        if (originalUrl.includes('/users/login') && method === 'POST') {
-            return res.redirect('/users/login');
-        }
-        if (originalUrl.includes('/files/upload') && method === 'POST') {
-            return res.redirect('/files/upload');
-        }
-        if (originalUrl.includes('/folders') && method === 'POST') {
-            return res.redirect('/folders/new');
-        }
-        if (originalUrl.includes('/folders') && method === 'PUT') {
-            // Extract folder ID from URL for edit redirects
-            const folderId = originalUrl.match(/\/folders\/([^\/]+)/)?.[1];
-            if (folderId) {
-                return res.redirect(`/folders/${folderId}/edit`);
-            }
-        }
-        if (originalUrl.includes('/assign-folder') && method === 'POST') {
-            // Extract file ID from URL for folder assignment redirects
-            const fileId = originalUrl.match(/\/files\/([^\/]+)/)?.[1];
-            if (fileId) {
-                return res.redirect(`/files/${fileId}`);
-            }
-        }
-        
-        // Default fallback
-        return res.redirect('back');
-    }
-    next(err);
 };
 
 module.exports = {
@@ -191,6 +152,5 @@ module.exports = {
     validateFileUpload,
     validateFolder,
     validateFolderAssignment,
-    handleValidationErrors,
-    validationErrorHandler
+    handleValidationErrors
 };

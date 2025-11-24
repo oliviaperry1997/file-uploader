@@ -32,7 +32,44 @@ const upload = multer({
     },
 });
 
+// GET /files/public - List all public files (no authentication required)
+router.get("/public", async (req, res) => {
+    try {
+        const files = await prisma.file.findMany({
+            where: {
+                isPublic: true
+            },
+            include: {
+                user: {
+                    select: {
+                        name: true
+                    }
+                },
+                folder: {
+                    select: {
+                        name: true
+                    }
+                }
+            },
+            orderBy: {
+                uploadedAt: "desc"
+            }
+        });
 
+        res.render("files/public", {
+            files,
+            title: "Public Files"
+        });
+    } catch (error) {
+        console.error("Error fetching public files:", error);
+        console.error("Error stack:", error.stack);
+        res.status(500).render("error", {
+            title: "Error",
+            message: "Unable to load public files",
+            error: error
+        });
+    }
+});
 
 // GET /files - List all files for the current user
 router.get("/", ensureAuthenticated, async (req, res) => {
@@ -154,6 +191,7 @@ router.post(
                     originalName: req.file.originalname,
                     mimeType: req.file.mimetype,
                     size: req.file.size,
+                    path: storagePath, // Keep for backwards compatibility
                     storagePath: storagePath,
                     description: req.body.description || null,
                     isPublic: req.body.isPublic === "true",
@@ -174,16 +212,34 @@ router.post(
 );
 
 // GET /files/:id/download - Download a file
-router.get("/:id/download", ensureAuthenticated, async (req, res) => {
+router.get("/:id/download", async (req, res) => {
     try {
-        const file = await prisma.file.findFirst({
-            where: {
+        // Build query based on authentication status
+        const whereClause = req.user 
+            ? {
                 id: req.params.id,
-                OR: [{ userId: req.user.id }, { isPublic: true }],
-            },
+                OR: [{ userId: req.user.id }, { isPublic: true }]
+            }
+            : {
+                id: req.params.id,
+                isPublic: true
+            };
+
+        const file = await prisma.file.findFirst({
+            where: whereClause,
         });
 
         if (!file) {
+            // Check if file exists but is private (for better error message)
+            const privateFile = await prisma.file.findFirst({
+                where: {
+                    id: req.params.id,
+                    isPublic: false
+                }
+            });
+            if (privateFile) {
+                return res.status(401).render("401", { title: "Unauthorized Access" });
+            }
             return res.status(404).render("404", { title: "File Not Found" });
         }
 
@@ -265,13 +321,21 @@ router.delete("/:id", ensureAuthenticated, async (req, res) => {
 });
 
 // GET /files/:id - Show file info page
-router.get("/:id", ensureAuthenticated, async (req, res) => {
+router.get("/:id", async (req, res) => {
     try {
-        const file = await prisma.file.findFirst({
-            where: {
+        // Build query based on authentication status
+        const whereClause = req.user 
+            ? {
                 id: req.params.id,
-                OR: [{ userId: req.user.id }, { isPublic: true }],
-            },
+                OR: [{ userId: req.user.id }, { isPublic: true }]
+            }
+            : {
+                id: req.params.id,
+                isPublic: true
+            };
+
+        const file = await prisma.file.findFirst({
+            where: whereClause,
             include: {
                 user: {
                     select: {
@@ -295,12 +359,22 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
         });
 
         if (!file) {
+            // Check if file exists but is private (for better error message)
+            const privateFile = await prisma.file.findFirst({
+                where: {
+                    id: req.params.id,
+                    isPublic: false
+                }
+            });
+            if (privateFile) {
+                return res.status(401).render("401", { title: "Unauthorized Access" });
+            }
             return res.status(404).render("404", { title: "File Not Found" });
         }
 
-        // Get all folders for folder assignment (only if user owns the file)
+        // Get all folders for folder assignment (only if user owns the file and is authenticated)
         let folders = [];
-        if (file.userId === req.user.id) {
+        if (req.user && file.userId === req.user.id) {
             folders = await prisma.folder.findMany({
                 where: { userId: req.user.id },
                 orderBy: { name: 'asc' }
@@ -312,7 +386,7 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
             file,
             folders,
             user: req.user,
-            canEdit: file.userId === req.user.id
+            canEdit: req.user && file.userId === req.user.id
         });
     } catch (error) {
         console.error("Error fetching file info:", error);
@@ -322,7 +396,6 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
 
 // POST /files/:id/assign-folder - Update file's folder assignment
 router.post("/:id/assign-folder", ensureAuthenticated, validateFolderAssignment, handleValidationErrors, async (req, res) => {
-    console.log('POST /files/:id/assign-folder route hit:', { fileId: req.params.id, folderId: req.body.folderId });
     try {
         const { folderId } = req.body;
 
@@ -362,9 +435,7 @@ router.post("/:id/assign-folder", ensureAuthenticated, validateFolderAssignment,
         });
 
         req.flash('success', 'File moved successfully');
-        const redirectUrl = `/files/${req.params.id}`;
-        console.log('Redirecting to:', redirectUrl);
-        res.redirect(redirectUrl);
+        res.redirect(`/files/${req.params.id}`);
     } catch (error) {
         console.error("Error updating file folder:", error);
         req.flash('error', 'Unable to move file');
@@ -373,16 +444,37 @@ router.post("/:id/assign-folder", ensureAuthenticated, validateFolderAssignment,
 });
 
 // GET /files/:id/preview - Get file preview URL (for images, etc.)
-router.get("/:id/preview", ensureAuthenticated, async (req, res) => {
+router.get("/:id/preview", async (req, res) => {
     try {
-        const file = await prisma.file.findFirst({
-            where: {
+        // Allow access to public files or files owned by authenticated user
+        const whereClause = req.user 
+            ? {
                 id: req.params.id,
-                OR: [{ userId: req.user.id }, { isPublic: true }],
-            },
+                OR: [
+                    { userId: req.user.id },
+                    { isPublic: true }
+                ]
+            }
+            : {
+                id: req.params.id,
+                isPublic: true
+            };
+
+        const file = await prisma.file.findFirst({
+            where: whereClause,
         });
 
         if (!file) {
+            // Check if file exists but is private (for better error message)
+            const privateFile = await prisma.file.findFirst({
+                where: {
+                    id: req.params.id,
+                    isPublic: false
+                }
+            });
+            if (privateFile) {
+                return res.status(401).json({ error: "Unauthorized access" });
+            }
             return res.status(404).json({ error: "File not found" });
         }
 

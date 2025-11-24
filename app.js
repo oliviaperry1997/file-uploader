@@ -13,7 +13,6 @@ const fs = require('fs');
 const fileRoutes = require("./routes/files");
 const userRoutes = require("./routes/users");
 const folderRoutes = require("./routes/folders");
-const { validationErrorHandler } = require("./middleware/validation");
 
 const app = express();
 const prisma = new PrismaClient();
@@ -65,9 +64,14 @@ app.use(makeUserAvailable);
 
 // Flash messages middleware
 app.use((req, res, next) => {
-    res.locals.success_msg = req.flash('success');
-    res.locals.error_msg = req.flash('error');
-    res.locals.error = req.flash('error');
+    const successMessages = req.flash('success');
+    const errorMessages = req.flash('error');
+    const validationErrors = req.flash('errors');
+    
+    res.locals.success_msg = successMessages;
+    res.locals.error_msg = errorMessages;
+    res.locals.error = errorMessages;
+    res.locals.errors = validationErrors;
     next();
 });
 
@@ -82,9 +86,6 @@ app.get("/", (req, res) => {
         title: "File Uploader"
     });
 });
-
-// Validation error handling middleware
-app.use(validationErrorHandler);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
