@@ -23,8 +23,9 @@ model User {
   updatedAt DateTime @updatedAt
   
   // Relationships
-  files     File[]
-  folders   Folder[]
+  files         File[]
+  folders       Folder[]
+  sharedFolders SharedFolder[]
 }
 
 model File {
@@ -64,8 +65,24 @@ model Folder {
   parent      Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children    Folder[] @relation("FolderHierarchy")
   files       File[]
+  sharedFolders SharedFolder[]
   
   @@map("folders")
+}
+
+model SharedFolder {
+  id        String   @id @default(cuid())
+  token     String   @unique @default(cuid()) // The shareable token in the URL
+  createdAt DateTime @default(now())
+  expiresAt DateTime // When the share expires
+  
+  // Relationships
+  folderId  String
+  folder    Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  userId    String   // The user who created the share
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("shared_folders")
 }
 
 model Session {

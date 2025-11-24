@@ -50,10 +50,22 @@ router.get('/', ensureAuthenticated, async (req, res) => {
             });
         }
 
+        // Get files in the current folder (either root or specific folder)
+        const files = await prisma.file.findMany({
+            where: {
+                userId: req.user.id,
+                folderId: req.query.parent || null
+            },
+            orderBy: {
+                originalName: 'asc'
+            }
+        });
+
         res.render('folders/index', {
             title: 'Folders',
             folders,
             currentFolder,
+            files,
             user: req.user
         });
     } catch (error) {
@@ -256,6 +268,47 @@ router.delete('/:id', ensureAuthenticated, async (req, res) => {
         console.error('Error deleting folder:', error);
         req.flash('error', 'Unable to delete folder');
         res.redirect('/folders');
+    }
+});
+
+// POST /folders/:id/share - Create a shareable link for a folder
+router.post('/:id/share', ensureAuthenticated, async (req, res) => {
+    try {
+        const { duration } = req.body;
+        const folderId = req.params.id;
+        
+        // Verify folder exists and belongs to user
+        const folder = await prisma.folder.findFirst({
+            where: {
+                id: folderId,
+                userId: req.user.id
+            }
+        });
+        
+        if (!folder) {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+        
+        // Parse duration and calculate expiration
+        const { getExpirationDate } = require('../utils/duration');
+        const expiresAt = getExpirationDate(duration);
+        
+        // Create shared folder entry
+        const sharedFolder = await prisma.sharedFolder.create({
+            data: {
+                folderId,
+                userId: req.user.id,
+                expiresAt
+            }
+        });
+        
+        res.json({
+            token: sharedFolder.token,
+            expiresAt: sharedFolder.expiresAt
+        });
+    } catch (error) {
+        console.error('Error creating folder share:', error);
+        res.status(500).json({ error: 'Unable to create share link' });
     }
 });
 
