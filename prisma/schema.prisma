@@ -10,8 +10,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -35,7 +36,8 @@ model File {
   mimeType     String
   size         Int
   path         String   // Legacy field - kept for backwards compatibility
-  storagePath  String?  // Supabase storage path - optional for migration
+  storagePath  String   // Supabase storage path in 'files' bucket
+  bucketName   String   @default("files") // Supabase storage bucket name
   uploadedAt   DateTime @default(now())
   
   // File metadata
