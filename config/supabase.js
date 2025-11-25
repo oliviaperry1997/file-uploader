@@ -8,7 +8,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 // Storage bucket name
-const STORAGE_BUCKET = 'user-files';
+const STORAGE_BUCKET = 'files';
 
 // Create Supabase client with service role key for full access
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
